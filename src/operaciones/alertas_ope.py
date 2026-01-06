@@ -1,0 +1,137 @@
+import pandas as pd
+import os
+from datetime import datetime
+from rich.console import Console
+from rich.table import Table
+
+console = Console()
+
+def auditar_anomalias(df_diego):
+    """
+    Recibe el DataFrame completo de DIEGO (pasado + futuro) y busca errores.
+    """
+    print("\n--- 🚨 AUDITORÍA DE DATOS (ALERTAS) ---")
+    
+    lista_alertas = []
+    
+    # Configuración de Rutas para validar el Mapa
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    FILE_MAPA_IDS = os.path.join(BASE_DIR, "01_data", "base_maestra_ids.xlsx")
+    DIR_OUTPUTS = os.path.join(BASE_DIR, "02_outputs", "operaciones")
+    ARCHIVO_ALERTAS = os.path.join(DIR_OUTPUTS, "reporte_alertas.xlsx")
+    
+    hoy = pd.Timestamp.now().normalize()
+
+    # ==============================================================================
+    # 1. ALERTA CRÍTICA: ID FALTANTE EN MAPA (Nuevo)
+    # ==============================================================================
+    ids_en_excel = set(df_diego[df_diego['ESTADO DE CLASE'].isna()]['ID'].unique()) # Solo nos preocupan los pendientes
+    
+    if os.path.exists(FILE_MAPA_IDS):
+        df_mapa = pd.read_excel(FILE_MAPA_IDS, sheet_name='Mapa', dtype={'ID': str})
+        ids_en_mapa = set(df_mapa['ID'].unique())
+        
+        # ¿Qué IDs tengo en mi Excel que NO están en el Mapa?
+        ids_sin_mapa = ids_en_excel - ids_en_mapa
+        
+        for id_missing in ids_sin_mapa:
+            lista_alertas.append({
+                'ID': id_missing, 
+                'Tipo': 'CRÍTICO: Falta en Mapa', 
+                'Detalle': 'El Bot fallará. Ejecuta "actualizar-mapa"', 
+                'Acción': 'Correr script mapa'
+            })
+    else:
+        console.print("[bold red]❌ No se encontró base_maestra_ids.xlsx. Imposible validar mapa.[/bold red]")
+
+    # ==============================================================================
+    # 2. ALERTA: CLASES EN EL LIMBO (Nuevo - Pasado sin estado)
+    # ==============================================================================
+    # Buscamos fechas menores a hoy que NO tengan estado (están vacías)
+    df_limbo = df_diego[(df_diego['FECHAS'] < hoy) & (df_diego['ESTADO DE CLASE'].isna())]
+    
+    for _, row in df_limbo.iterrows():
+        lista_alertas.append({
+            'ID': row['ID'],
+            'Tipo': 'Gestión: Clase en Limbo',
+            'Detalle': f"Fecha {row['FECHAS'].strftime('%d/%m')} sin Estado",
+            'Acción': 'Actualizar Excel Panel'
+        })
+
+    # ==============================================================================
+    # 3. ALERTA: DATOS FALTANTES (Nuevo - Futuro incompleto)
+    # ==============================================================================
+    # Buscamos clases futuras que les falte sesión o docente
+    df_futuro = df_diego[df_diego['FECHAS'] >= hoy]
+    df_incompleto = df_futuro[df_futuro['SESIÓN'].isna() | df_futuro['DOCENTE'].isna()]
+    
+    for _, row in df_incompleto.iterrows():
+        lista_alertas.append({
+            'ID': row['ID'],
+            'Tipo': 'Datos Faltantes',
+            'Detalle': f"Falta Docente o Sesión para {row['FECHAS'].strftime('%d/%m')}",
+            'Acción': 'Completar datos'
+        })
+
+    # ==============================================================================
+    # 4. ALERTAS DE CONSISTENCIA (Tu código original mejorado)
+    # ==============================================================================
+    for id_val, grupo in df_diego.groupby('ID'):
+        # Nombre Contradictorio
+        c_unicos = grupo['CURSO'].dropna().unique()
+        if len(c_unicos) > 1:
+            lista_alertas.append({
+                'ID': id_val, 
+                'Tipo': 'Nombre Contradictorio', 
+                'Detalle': " / ".join(str(x) for x in c_unicos), 
+                'Acción': 'Unificar nombre'
+            })
+        
+        # Múltiples Docentes
+        d_unicos = grupo['DOCENTE'].dropna().unique()
+        if len(d_unicos) > 1:
+            lista_alertas.append({
+                'ID': id_val, 
+                'Tipo': 'Múltiples Docentes', 
+                'Detalle': " / ".join(str(x) for x in d_unicos), 
+                'Acción': 'Verificar reemplazo'
+            })
+
+    # ==============================================================================
+    # 5. RESULTADOS
+    # ==============================================================================
+    if lista_alertas:
+        df_alertas = pd.DataFrame(lista_alertas)
+        
+        # A. Mostrar en Terminal (Rich Table) - ¡Vistazo Rápido!
+        table = Table(title="🚨 ALERTAS DETECTADAS", style="red")
+        table.add_column("ID", style="cyan")
+        table.add_column("Tipo", style="bold red")
+        table.add_column("Detalle", style="white")
+        
+        for alerta in lista_alertas:
+            table.add_row(str(alerta['ID']), alerta['Tipo'], str(alerta['Detalle']))
+        
+        console.print(table)
+        
+        # B. Guardar Excel (Tu formato original)
+        try:
+            with pd.ExcelWriter(ARCHIVO_ALERTAS, engine='xlsxwriter') as writer:
+                df_alertas.to_excel(writer, index=False, sheet_name='Alertas')
+                worksheet = writer.sheets['Alertas']
+                f_wrap = writer.book.add_format({'text_wrap': True, 'valign': 'top'})
+                worksheet.set_column('A:A', 20, f_wrap)
+                worksheet.set_column('B:B', 25, f_wrap)
+                worksheet.set_column('C:C', 50, f_wrap)
+                worksheet.set_column('D:D', 20, f_wrap)
+            
+            console.print(f"[yellow]📂 Reporte detallado guardado en: {ARCHIVO_ALERTAS}[/yellow]")
+            return True
+            
+        except Exception as e:
+            console.print(f"[bold red]❌ Error al guardar alertas: {e}[/bold red]")
+            return False
+            
+    else:
+        console.print("[bold green]✨ ¡Todo limpio! No se detectaron anomalías operativas.[/bold green]")
+        return False

@@ -1,0 +1,27 @@
+# Entorno Virtual
+.venv/
+env/
+venv/
+ENV/
+
+# Archivos de configuración sensible (Seguridad)
+.env
+
+# Persistencia de Navegador (Contiene sesiones y cookies privadas)
+00_inputs/chrome_profile/
+
+# Datos temporales y de procesamiento interno
+01_data/*.xlsx
+01_data/*.csv
+
+# Reportes finales (Opcional: puedes quitarlos si quieres guardar históricos en Git)
+02_outputs/bot_blackboard/*.xlsx
+02_outputs/operaciones/*.xlsx
+
+# Archivos de caché de Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos temporales de Excel (Cuando el archivo está abierto)
+~$*.xlsx
