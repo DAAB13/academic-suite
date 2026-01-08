@@ -1,8 +1,11 @@
 import pandas as pd
 import os
+from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from src.shared.excel_utils import copiar_archivo_onedrive
+from src.shared.config_loader import config, BASE_DIR
+from src.shared.config_loader import config
 
 # Inicializamos la consola de Rich
 console = Console()
@@ -11,20 +14,26 @@ def run():
     # ==========================================
     # 1. CONFIGURACIÓN DE RUTAS (INTACTA)
     # ==========================================
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-    # Carpetas principales
-    DIR_INPUTS = os.path.join(BASE_DIR, "00_inputs")
-    DIR_DATA = os.path.join(BASE_DIR, "01_data")
+    # ==========================================
+    # 1. CONFIGURACIÓN DE RUTAS (REFÁCTORIZADO)
+    # ==========================================
+    
+    # Carpetas principales (paths relatives to BASE_DIR from config_loader)
+    DIR_INPUTS = BASE_DIR / config['paths']['inputs']
+    DIR_DATA = BASE_DIR / config['paths']['data']
 
     # Archivos de entrada
-    FILE_MAPA_IDS = os.path.join(DIR_DATA, "base_maestra_ids.xlsx")
-    NOMBRE_ARCHIVO_PROG = "PANEL DE PROGRAMACIÓN V7.xlsx"
-    RUTA_ORIGEN_ONEDRIVE = fr"C:\Users\Diego AB\OneDrive - EduCorpPERU\POSGRADO-EPEC - Panel de Control Integrado\{NOMBRE_ARCHIVO_PROG}"
-    RUTA_TRABAJO_LOCAL = os.path.join(DIR_INPUTS, NOMBRE_ARCHIVO_PROG)
+    FILE_MAPA_IDS = DIR_DATA / config['files']['base_maestra_ids']
+    NOMBRE_ARCHIVO_PROG = config['files']['programacion']
+    
+    # Construcción robusta path onedrive
+    path_onedrive_base = Path(config['paths']['onedrive'])
+    RUTA_ORIGEN_ONEDRIVE = path_onedrive_base / NOMBRE_ARCHIVO_PROG
+    
+    RUTA_TRABAJO_LOCAL = DIR_INPUTS / NOMBRE_ARCHIVO_PROG
 
     # Archivos de salida
-    ARCHIVO_RESUMEN_LLAVE = os.path.join(DIR_DATA, "resumen_con_llave.xlsx")
+    ARCHIVO_RESUMEN_LLAVE = DIR_DATA / config['files']['resumen_llave']
 
     # ==========================================
     # 2. COPIA DE SEGURIDAD (CON VISUALIZACIÓN RICH)

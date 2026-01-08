@@ -2,6 +2,7 @@ import win32com.client as win32
 import os
 import pandas as pd
 from rich.console import Console
+from src.shared.config_loader import config, BASE_DIR
 
 console = Console()
 
@@ -29,16 +30,15 @@ def crear_borrador(contenido_cuerpo, df_alertas):
     """Crea el borrador unificando la ruta del archivo."""
     try:
         # 1. DEFINIMOS LA RUTA UNA SOLA VEZ
-        ruta_base = os.getcwd()
-        nombre_archivo = 'tabla_reporte_domingo.xlsx'
-        ruta_final_excel = os.path.join(ruta_base, '01_data', 'reporte_semanal', nombre_archivo)
+        # ruta_base = os.getcwd() -> Reemplazado por BASE_DIR
+        ruta_final_excel = str(BASE_DIR / config['paths']['data'] / config['files']['reporte_domingo'])
 
         outlook = win32.Dispatch('outlook.application')
         mail = outlook.CreateItem(0)
         
-        # Actualizado con el nombre que sale en tu captura
-        mail.To = 'wilbert.garate@upn.edu.pe' 
-        mail.Subject = 'REPORTE SEMANAL SUPERVISIÓN CLASES'
+        # Actualizado desde config.yaml
+        mail.To = config['reporting']['recipient']
+        mail.Subject = config['reporting']['subject']
         
         # 2. verificamos que exista para crear tabla html
         if os.path.exists(ruta_final_excel):

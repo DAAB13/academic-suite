@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
+from src.shared.config_loader import config, BASE_DIR
 
 console = Console()
 
@@ -15,10 +16,8 @@ def auditar_anomalias(df_diego):
     lista_alertas = []
     
     # Configuración de Rutas para validar el Mapa
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    FILE_MAPA_IDS = os.path.join(BASE_DIR, "01_data", "base_maestra_ids.xlsx")
-    DIR_OUTPUTS = os.path.join(BASE_DIR, "02_outputs", "operaciones")
-    ARCHIVO_ALERTAS = os.path.join(DIR_OUTPUTS, "reporte_alertas.xlsx")
+    FILE_MAPA_IDS = BASE_DIR / config['paths']['data'] / config['files']['base_maestra_ids']
+    ARCHIVO_ALERTAS = BASE_DIR / config['paths']['outputs'] / config['files']['reporte_alertas']
     
     hoy = pd.Timestamp.now().normalize()
 

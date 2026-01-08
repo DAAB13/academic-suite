@@ -1,0 +1,17 @@
+paths:
+  inputs: "00_inputs"
+  data: "01_data"
+  outputs: "02_outputs"
+  onedrive: "C:\\Users\\Diego AB\\OneDrive - EduCorpPERU\\POSGRADO-EPEC - Panel de Control Integrado"
+
+files:
+  programacion: "PANEL DE PROGRAMACIÓN V7.xlsx"
+  base_maestra_ids: "base_maestra_ids.xlsx"
+  resumen_llave: "resumen_con_llave.xlsx"
+  incidencias_log: "reporte_semanal/incidencias_log.csv"
+  reporte_domingo: "reporte_semanal/tabla_reporte_domingo.xlsx"
+  reporte_alertas: "operaciones/reporte_alertas.xlsx"
+
+reporting:
+  recipient: "wilbert.garate@upn.edu.pe"
+  subject: "REPORTE SEMANAL SUPERVISIÓN CLASES"

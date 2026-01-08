@@ -5,14 +5,15 @@ from rich.console import Console
 from rich.table import Table
 from rich import box
 from src.shared.excel_utils import copiar_archivo_onedrive
+from src.shared.config_loader import config, BASE_DIR
 import os
 
 console = Console()
 
-PATH_ONEDRIVE = Path(r"C:\Users\Diego AB\OneDrive - EduCorpPERU\POSGRADO-EPEC - Panel de Control Integrado\PANEL DE PROGRAMACIÓN V7.xlsx")
-PATH_INPUT_LOCAL = Path("00_inputs/PANEL DE PROGRAMACIÓN V7.xlsx")
-PATH_LOG = Path("01_data/reporte_semanal/incidencias_log.csv")
-PATH_OUTPUT = Path("01_data/reporte_semanal/tabla_reporte_domingo.xlsx")
+PATH_ONEDRIVE = Path(config['paths']['onedrive']) / config['files']['programacion']
+PATH_INPUT_LOCAL = BASE_DIR / config['paths']['inputs'] / config['files']['programacion']
+PATH_LOG = BASE_DIR / config['paths']['data'] / config['files']['incidencias_log']
+PATH_OUTPUT = BASE_DIR / config['paths']['data'] / config['files']['reporte_domingo']
 
 def run():
     console.rule("[bold cyan]🚀 INICIANDO ETL DOMINICAL[/bold cyan]")
