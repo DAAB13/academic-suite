@@ -6,11 +6,12 @@ paths:
 
 files:
   programacion: "PANEL DE PROGRAMACIÓN V7.xlsx"
-  base_maestra_ids: "base_maestra_ids.xlsx"
-  resumen_llave: "resumen_con_llave.xlsx"
+  base_maestra_ids: "bot_blackboard/base_maestra_ids.csv"
+  resumen_llave: "bot_blackboard/resumen_con_llave.csv"
   incidencias_log: "reporte_semanal/incidencias_log.csv"
   reporte_domingo: "reporte_semanal/tabla_reporte_domingo.xlsx"
   reporte_alertas: "operaciones/reporte_alertas.xlsx"
+  reporte_grabaciones: "bot_blackboard/reporte_grabaciones.xlsx"
 
 reporting:
   recipient: "wilbert.garate@upn.edu.pe"

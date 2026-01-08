@@ -5,6 +5,8 @@ import requests
 import time
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
+from pathlib import Path
+from src.shared.config_loader import config, BASE_DIR
 # IMPORTACIONES RICH
 from rich.console import Console
 from rich.panel import Panel
@@ -15,16 +17,15 @@ def run():
     # ==========================================
     # 1. CONFIGURACIÓN DE RUTAS
     # ==========================================
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
     # Carga las variables
     load_dotenv(os.path.join(BASE_DIR, ".env")) 
     USER_ID_BB = os.getenv("USER_ID_BB")
 
-    # Carpetas
-    CARPETA_DATA = os.path.join(BASE_DIR, "01_data")
-    os.makedirs(CARPETA_DATA, exist_ok=True)
-    ARCHIVO_SALIDA = os.path.join(CARPETA_DATA, "base_maestra_ids.xlsx")
+    # Construcción dinámica: academic-suite/ + 01_data/ + bot_blackboard/base_maestra_ids.csv
+    ARCHIVO_SALIDA = BASE_DIR / config['paths']['data'] / config['files']['base_maestra_ids']
+    
+    # Crea la subcarpeta 'bot_blackboard' automáticamente si no existe
+    ARCHIVO_SALIDA.parent.mkdir(parents=True, exist_ok=True)
 
     # Validación
     if not USER_ID_BB:
@@ -96,20 +97,7 @@ def run():
             # ==========================================
             # 4. EXPORTACIÓN
             # ==========================================
-            writer = pd.ExcelWriter(ARCHIVO_SALIDA, engine='xlsxwriter')
-            df.to_excel(writer, index=False, sheet_name='Mapa')
-            
-            # Formato Excel
-            workbook  = writer.book
-            worksheet = writer.sheets['Mapa']
-            formato_texto = workbook.add_format({'num_format': '@'})
-            
-            worksheet.set_column('A:A', 20, formato_texto) 
-            worksheet.set_column('B:B', 70)                
-            worksheet.set_column('C:C', 25)                
-            worksheet.set_column('D:D', 40)                
-            
-            writer.close()
+            df.to_csv(ARCHIVO_SALIDA, index=False, sep=';', encoding='latin1')
             
             # Panel de Éxito
             mensaje_final = f"""

@@ -4,21 +4,34 @@ import time
 import re
 from datetime import datetime
 from playwright.sync_api import sync_playwright
-from src.bot_blackboard import vista_bot as vista #rich
+# Importamos la configuración centralizada
+from src.shared.config_loader import config, BASE_DIR
+# Asumimos que vista_bot está en la misma carpeta o accesible
+from src.bot_blackboard import vista_bot as vista 
 
 def run():
     # ==========================================
-    # CONFIGURACIÓN (Ajustada a 3 niveles)
+    # CONFIGURACIÓN (Rutas conectadas al YAML)
     # ==========================================
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    
-    INPUT_FILE = os.path.join(BASE_DIR, "01_data", "resumen_con_llave.xlsx")
-    OUTPUT_DIR = os.path.join(BASE_DIR, "02_outputs", "bot_blackboard")
-    OUTPUT_FILE = os.path.join(OUTPUT_DIR, "reporte_grabaciones.xlsx")
-    USER_DATA_DIR = os.path.join(BASE_DIR, "00_inputs", "chrome_profile")
+    # 1. Definimos las carpetas base
+    DIR_INPUTS = BASE_DIR / config['paths']['inputs']
+    DIR_DATA = BASE_DIR / config['paths']['data']       # Para leer el CSV
+    DIR_OUTPUTS = BASE_DIR / config['paths']['outputs'] # Para guardar el Excel final
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    os.makedirs(os.path.dirname(USER_DATA_DIR), exist_ok=True)
+    # 2. Archivos
+    # INPUT: 01_data/bot_blackboard/resumen_con_llave.csv
+    INPUT_FILE = DIR_DATA / config['files']['resumen_llave']
+    
+    # OUTPUT: 02_outputs/bot_blackboard/reporte_grabaciones.xlsx
+    OUTPUT_FILE = DIR_OUTPUTS / config['files']['reporte_grabaciones']
+    
+    # Perfil de Chrome
+    USER_DATA_DIR = DIR_INPUTS / "chrome_profile"
+
+    # 3. Creación de Carpetas (Seguridad)
+    # Esto creará '02_outputs/bot_blackboard' automáticamente si no existe
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True) 
+    USER_DATA_DIR.parent.mkdir(parents=True, exist_ok=True)
 
     # Mapeo de meses
     MESES_EN = {
@@ -26,7 +39,7 @@ def run():
         "July": "07", "August": "08", "September": "09", "October": "10", "November": "11", "December": "12"
     }
 
-    # --- FUNCIONES HELPER (Mantienen tu lógica original) ---
+    # --- FUNCIONES HELPER (INTACTAS) ---
     def parsear_fecha_compleja(texto_raw):
         fecha_fmt, inicio_fmt, fin_fmt = texto_raw, "", ""
         texto_limpio = texto_raw.replace("\n", " ").replace("\r", " ").strip()
@@ -80,16 +93,19 @@ def run():
             page.goto(url, wait_until="domcontentloaded")
 
     # ==========================================
-    # LÓGICA PRINCIPAL (Ya no está indentada dentro de otro run)
+    # LÓGICA PRINCIPAL
     # ==========================================
-    if not os.path.exists(INPUT_FILE):
-        print("❌ Error: Falta resumen_con_llave.xlsx")
+    if not INPUT_FILE.exists():
+        print(f"❌ Error: Falta {INPUT_FILE}")
+        print("💡 Ejecuta 'python academic.py bb etl' primero.")
         return
 
-    df_input = pd.read_excel(INPUT_FILE, dtype={'ID': str})
+    # LECTURA DEL CSV INTERMEDIO (01_data)
+    df_input = pd.read_csv(INPUT_FILE, sep=';', dtype={'ID': str}, encoding='latin1')
+    
     all_recordings = []
 
-    # [VISUAL] Tabla de Pre-vuelo en lugar de print simple
+    # [VISUAL] Tabla de Pre-vuelo
     vista.mostrar_tabla_prevuelo(df_input)
 
     with sync_playwright() as p:
@@ -250,13 +266,16 @@ def run():
         if all_recordings:
             print(f"\n💾 Guardando reporte FINAL en: {OUTPUT_FILE}")
             df = pd.DataFrame(all_recordings)
+            
+            # GUARDADO FINAL (02_outputs)
+            # Mantenemos xlsxwriter para generar el Excel limpio y bonito
             with pd.ExcelWriter(OUTPUT_FILE, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name='Reporte')
                 ws = writer.sheets['Reporte']
                 ws.set_column('A:A', 15)
                 ws.set_column('D:F', 12) # Fecha y Horas
                 ws.set_column('H:I', 60)
-            print("✨ ¡FIN!")
+            print("✨ ¡FIN DEL PROCESO RPA!")
 
 if __name__ == "__main__":
     run()
