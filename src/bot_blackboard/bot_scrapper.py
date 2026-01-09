@@ -4,15 +4,103 @@ import time
 import re
 from datetime import datetime
 from playwright.sync_api import sync_playwright
+from dotenv import load_dotenv # Necesario para leer usuario/pass
 # Importamos la configuración centralizada
 from src.shared.config_loader import config, BASE_DIR
 # Asumimos que vista_bot está en la misma carpeta o accesible
 from src.bot_blackboard import vista_bot as vista 
 
+def gestionar_login_upn(page, user_mail, user_pass):
+    """
+    Función robusta que maneja el flujo de Login de UPN/Laureate.
+    Detecta si ya estamos logueados o si es necesario ingresar credenciales.
+    ACTUALIZADO: Usa IDs específicos de ASP.NET y esperas inteligentes.
+    """
+    vista.log_accion("Verificando estado de sesión...", icono="🔐")
+    
+    # Navegamos a la portada. Si hay cookies válidas, esto redirigirá solo.
+    try:
+        page.goto("https://upn-colaborador.blackboard.com/", wait_until="domcontentloaded")
+        time.sleep(3) # Pequeña pausa para dejar que las redirecciones ocurran
+    except:
+        pass
+
+    # CASO 1: Ya estamos dentro (Redirección exitosa a Ultra)
+    if "ultra" in page.url or "stream" in page.url:
+        vista.log_exito("Sesión recuperada (Cookies válidas)")
+        return True
+
+    # CASO 2: Estamos en la portada (Requiere Login)
+    # Buscamos el botón "Supervisores"
+    btn_supervisores = page.locator("text=Supervisores")
+    
+    if btn_supervisores.is_visible():
+        vista.log_accion("Iniciando Login Automático...", icono="🤖")
+        btn_supervisores.click()
+        
+        # --- FASE 1: INGRESAR CREDENCIALES ---
+        try:
+            # Definimos los selectores EXACTOS que encontramos con F12
+            selector_user = "input[id$='txtUserid']"
+            selector_pass = "input[id$='tbxPassword']"
+            selector_btn_login = "input[id$='btnSubmit']" # El botón de la primera pantalla
+            
+            # Esperamos explícitamente a que aparezca el campo de usuario
+            page.wait_for_selector(selector_user, timeout=10000)
+            
+            # Llenamos datos
+            page.locator(selector_user).fill(user_mail)
+            page.locator(selector_pass).fill(user_pass)
+            
+            # Click en Enviar
+            page.locator(selector_btn_login).click()
+            vista.log_accion("Credenciales enviadas...", icono="📨")
+            
+            # --- FASE 2: MANEJO DE MFA (Z FLIP6) ---
+            # Buscamos el botón "Enviar" morado de la pantalla de MFA.
+            # ID termina en: RegistrationMethodView_btnSubmit
+            selector_mfa_btn = "input[id$='RegistrationMethodView_btnSubmit']"
+            
+            vista.log_alerta("Buscando botón de confirmación MFA...")
+            
+            # Espera inteligente (wait_for_selector es clave aquí)
+            try:
+                page.wait_for_selector(selector_mfa_btn, state="visible", timeout=15000)
+                time.sleep(0.5) # Pequeña pausa de estabilidad
+                
+                vista.log_accion("Enviando solicitud al celular...", icono="📱")
+                page.locator(selector_mfa_btn).click()
+                
+                vista.log_alerta("¡ACCIÓN REQUERIDA! Acepta en tu Z Flip6 ahora.")
+            except:
+                # Si no aparece el botón, quizás el sistema saltó este paso
+                vista.log_accion("No se requirió clic en MFA o ya pasó.", icono="ℹ️")
+
+            # --- FASE 3: ESPERAR ACCESO FINAL ---
+            # Damos 120 segundos para que busques tu cel y aceptes
+            page.wait_for_url("**/ultra/stream", timeout=120000)
+            vista.log_exito("Acceso autorizado detectado.")
+            return True
+            
+        except Exception as e:
+            vista.log_error(f"Fallo en proceso de login: {e}")
+            return False
+            
+    # Si no encuentra ni Ultra ni el botón Supervisores, algo raro pasa
+    elif "login" in page.url:
+        vista.log_alerta("Pantalla de login directo detectada. (Flujo alternativo)")
+        pass
+
+    return True
+
 def run():
     # ==========================================
     # CONFIGURACIÓN (Rutas conectadas al YAML)
     # ==========================================
+    load_dotenv(os.path.join(BASE_DIR, ".env")) # Cargamos credenciales
+    UPN_MAIL = os.getenv("UPN_MAIL")
+    UPN_PASS = os.getenv("UPN_PASS")
+
     # 1. Definimos las carpetas base
     DIR_INPUTS = BASE_DIR / config['paths']['inputs']
     DIR_DATA = BASE_DIR / config['paths']['data']       # Para leer el CSV
@@ -29,7 +117,6 @@ def run():
     USER_DATA_DIR = DIR_INPUTS / "chrome_profile"
 
     # 3. Creación de Carpetas (Seguridad)
-    # Esto creará '02_outputs/bot_blackboard' automáticamente si no existe
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True) 
     USER_DATA_DIR.parent.mkdir(parents=True, exist_ok=True)
 
@@ -123,11 +210,22 @@ def run():
 
         page = browser_context.pages[0]
 
-        print("\n🔑 PASO 1: LOGIN MANUAL")
-        page.goto("https://upn-colaborador.blackboard.com/")
-        input("👉 LOGUEATE, ESPERA A VER TUS CURSOS Y PRESIONA ENTER... ")
-        print("⏳ Enfriando (3s)...")
-        time.sleep(3)
+        # --- CAMBIO IMPORTANTE: LOGIN AUTOMÁTICO ---
+        if not UPN_MAIL or not UPN_PASS:
+            print("⚠️ Faltan credenciales en .env. Pasando a modo manual...")
+            page.goto("https://upn-colaborador.blackboard.com/")
+            input("👉 LOGUEATE, ESPERA A VER TUS CURSOS Y PRESIONA ENTER... ")
+        else:
+            # Ejecutamos la lógica de auto-login ACTUALIZADA
+            login_exitoso = gestionar_login_upn(page, UPN_MAIL, UPN_PASS)
+            if not login_exitoso:
+                print("❌ Fallo crítico en login. Abortando.")
+                browser_context.close()
+                return
+
+        # Si llegamos aquí, estamos logueados y en Blackboard.
+        # Damos un respiro antes de empezar el ciclo agresivo
+        time.sleep(2)
 
         for index, row in df_input.iterrows():
             id_curso_visible = row.get('ID', 'SinID')
@@ -268,7 +366,6 @@ def run():
             df = pd.DataFrame(all_recordings)
             
             # GUARDADO FINAL (02_outputs)
-            # Mantenemos xlsxwriter para generar el Excel limpio y bonito
             with pd.ExcelWriter(OUTPUT_FILE, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name='Reporte')
                 ws = writer.sheets['Reporte']

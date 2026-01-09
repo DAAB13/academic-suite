@@ -20,8 +20,10 @@ def run():
     # Carga las variables
     load_dotenv(os.path.join(BASE_DIR, ".env")) 
     USER_ID_BB = os.getenv("USER_ID_BB")
+    UPN_MAIL = os.getenv("UPN_MAIL")
+    UPN_PASS = os.getenv("UPN_PASS")
 
-    # Construcción dinámica: academic-suite/ + 01_data/ + bot_blackboard/base_maestra_ids.csv
+    # Construcción dinámica
     ARCHIVO_SALIDA = BASE_DIR / config['paths']['data'] / config['files']['base_maestra_ids']
     
     # Crea la subcarpeta 'bot_blackboard' automáticamente si no existe
@@ -33,20 +35,84 @@ def run():
         return
 
     # ==========================================
-    # 2. OBTENCIÓN DE COOKIES (PLAYWRIGHT)
+    # 2. OBTENCIÓN DE COOKIES (PLAYWRIGHT AUTO-LOGIN)
     # ==========================================
     with sync_playwright() as p:
-        console.print("[bold magenta]--- 🎭 INICIANDO SESIÓN MANUAL ---[/bold magenta]")
+        console.print("[bold magenta]--- 🎭 INICIANDO AUTENTICACIÓN AUTOMÁTICA ---[/bold magenta]")
         
         # Lanzamos navegador
         browser = p.chromium.launch(headless=False)
         context = browser.new_context()
         page = context.new_page()
 
+        # NAVEGACIÓN INICIAL
         page.goto("https://upn-colaborador.blackboard.com/")
         
-        console.print("\n[bold yellow]🔑 ACCIÓN REQUERIDA:[/bold yellow] Realiza el Login en la ventana de Chrome.")
-        input("👉 Cuando veas tus cursos, presiona ENTER aquí para capturar la llave... ")
+        # LOGICA DE LOGIN AUTOMATICO
+        if UPN_MAIL and UPN_PASS:
+            try:
+                # 1. Click en Supervisores (Si existe)
+                btn_sup = page.locator("text=Supervisores")
+                if btn_sup.is_visible():
+                    btn_sup.click()
+
+                # 2. Llenar credenciales (USANDO IDS PRECISOS DE UPN)
+                try: 
+                    # Definimos los selectores exactos de tu captura F12
+                    selector_user = "input[id$='txtUserid']"
+                    selector_pass = "input[id$='tbxPassword']"
+                    selector_btn = "input[id$='btnSubmit']"
+
+                    # Esperamos a que el campo de usuario aparezca
+                    page.wait_for_selector(selector_user, timeout=10000)
+                    
+                    # Llenamos la información
+                    page.locator(selector_user).fill(UPN_MAIL)
+                    page.locator(selector_pass).fill(UPN_PASS)
+                    
+                    # Hacemos clic en el botón Enviar (que es un input, no un button)
+                    page.locator(selector_btn).click()
+                    console.print("[bold green]✔ Datos de acceso ingresados...[/bold green]")
+                except Exception as e:
+                    console.print(f"[yellow]⚠ No se detectó el formulario de login (quizás ya inició sesión): {e}[/yellow]")
+
+                # 3. Manejo de MFA (Z Flip6)
+                try:
+                    # Selector exacto basado en tu F12 (id completo para evitar errores)
+                    selector_mfa_btn = "input#ContentPlaceHolder1_MFALoginControl1_RegistrationMethodView_btnSubmit"
+                    
+                    console.print("[dim]⏳ Buscando botón de envío de MFA...[/dim]")
+                    
+                    # CORRECCIÓN: wait_for_selector SI espera a que aparezca el botón
+                    page.wait_for_selector(selector_mfa_btn, state="visible", timeout=15000)
+                    
+                    # Un pequeño respiro de medio segundo para asegurar que el click sea efectivo
+                    time.sleep(0.5) 
+                    
+                    console.print("[bold yellow]📱 Enviando solicitud de inicio a tu Z Flip6...[/bold yellow]")
+                    page.locator(selector_mfa_btn).click()
+                    
+                    console.print("[bold cyan]📲 ¡Revisa tu teléfono ahora y dale a ACEPTAR![/bold cyan]")
+                except Exception as e:
+                    console.print(f"[dim]ℹ️ No se detectó el botón de MFA (quizás ya pasó): {e}[/dim]")
+                    
+                
+                # 4. ESPERA INTELIGENTE DE ÉXITO
+                console.print("[dim]⏳ Esperando acceso a Blackboard...[/dim]")
+                try:
+                    # Esperamos hasta 2 minutos (120000 ms) para que aceptes en el cel
+                    page.wait_for_url("**/ultra/stream", timeout=120000)
+                    console.print("[bold green]✅ Login Exitoso detectado.[/bold green]")
+                except:
+                    console.print("[bold red]❌ Tiempo de espera agotado o login fallido.[/bold red]")
+                    browser.close()
+                    return
+
+            except Exception as e:
+                console.print(f"[red]Error en flujo de login: {e}[/red]")
+        else:
+            console.print("[yellow]⚠️ Sin credenciales en .env. Login manual requerido.[/yellow]")
+            input("👉 Presiona ENTER cuando hayas ingresado...")
 
         # Extraemos cookies
         cookies = context.cookies()

@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 # --- APLICACIÓN PRINCIPAL ---
 app = typer.Typer(
     name="Academic Suite",
-    help="Sistema de Orquestación Operativa y RPA para la UPN.",
+    help=" 🐍 Sistema de Orquestación Operativa y RPA 😎.",
     add_completion=False,
     rich_markup_mode="rich"
 )
@@ -34,14 +34,14 @@ app.add_typer(reporte_app, name="repo")
 
 @bb_app.command('mapa')
 def actualizar_mapa():
-    """Ejecutar cuando tenga permisos de supervicion en nuevos programas. Actualiza la Base Maestra de IDs desde la API de Blackboard."""
+    """Ejecutar cuando se asignen nuevos programas. Actualiza la base_maestra_ids.csv"""
     print("[bold magenta]🗺️  Iniciando actualización de Mapa de IDs...[/bold magenta]")
     mapa.run()
     print("[bold green]✅ Mapa sincronizado correctamente.[/bold green]")
 
 @bb_app.command('etl')
 def etl_blackboard():
-    """Prepara (resumen_con_llave) de mis cursos 'activos' para el bot_scrapper en blackboard."""
+    """Prepara resumen_con_llave.csv de cursos'activos' para bot_scrapper."""
     print("[bold yellow]⏳ Iniciando limpieza de datos ETL...[/bold yellow]")
     etl_bot.run()
     print("[bold green]✅ Combustible para el Bot listo.[/bold green]")
@@ -59,9 +59,9 @@ def bot_scrapper_blackboard():
 # 📅 COMANDOS OPERACIONES (SUPERVISIÓN) -> Grupo 'ope'
 # ==================================================
 
-@ope_app.command('etl')
+@ope_app.command('day')
 def etl_operaciones():
-    """Genera la agenda de supervisión diaria y audita alertas."""
+    """Supervisión diaria y alertas."""
     print("[bold cyan]📅 Generando agenda operativa...[/bold cyan]")
     etl_ope.run()
     # La vista_diaria ya imprime el resultado final, no necesitamos print extra aquí
@@ -78,12 +78,12 @@ def registrar_incidencia(
     # Mantenemos el default de hoy, pero si escribes --fecha DD/MM/AAAA lo sobreescribe
     fecha: str = typer.Option(datetime.now().strftime("%d/%m/%Y"), "--fecha", help="Fecha de la clase (DD/MM/YYYY)")
 ):
-    """Anota una incidencia vinculada a un ID y una FECHA específica."""
+    """--id '' --fecha '' --motvio ''"""
     incidencias.registrar(id_clase, motivo, fecha)
 
 @reporte_app.command('sunday')
 def ejecutar_reporte_semanal():
-    """[DOMINGOS] Procesa Panel V7 y redacta el correo con IA."""
+    """Genera reporte los domingos por correo electrónico"""
     df_para_ia = etl_sunday.run()
     
     if df_para_ia is not None:

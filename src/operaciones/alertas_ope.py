@@ -16,18 +16,25 @@ def auditar_anomalias(df_diego):
     lista_alertas = []
     
     # Configuración de Rutas para validar el Mapa
+    # FILE_MAPA_IDS apunta al CSV en 01_data/bot_blackboard/
     FILE_MAPA_IDS = BASE_DIR / config['paths']['data'] / config['files']['base_maestra_ids']
-    ARCHIVO_ALERTAS = BASE_DIR / config['paths']['outputs'] / config['files']['reporte_alertas']
+    
+    # ARCHIVO_ALERTAS ahora será un CSV en 01_data/operaciones/
+    ARCHIVO_ALERTAS = BASE_DIR / config['paths']['data'] / config['files']['reporte_alertas']
+    
+    # Aseguramos que la carpeta 01_data/operaciones exista
+    ARCHIVO_ALERTAS.parent.mkdir(parents=True, exist_ok=True)
     
     hoy = pd.Timestamp.now().normalize()
 
     # ==============================================================================
-    # 1. ALERTA CRÍTICA: ID FALTANTE EN MAPA (Nuevo)
+    # 1. ALERTA CRÍTICA: ID FALTANTE EN MAPA (Actualizado a CSV)
     # ==============================================================================
     ids_en_excel = set(df_diego[df_diego['ESTADO DE CLASE'].isna()]['ID'].unique()) # Solo nos preocupan los pendientes
     
     if os.path.exists(FILE_MAPA_IDS):
-        df_mapa = pd.read_excel(FILE_MAPA_IDS, sheet_name='Mapa', dtype={'ID': str})
+        # Leemos el CSV con la configuración correcta (separador ; y latin1)
+        df_mapa = pd.read_csv(FILE_MAPA_IDS, sep=';', dtype={'ID': str}, encoding='latin1')
         ids_en_mapa = set(df_mapa['ID'].unique())
         
         # ¿Qué IDs tengo en mi Excel que NO están en el Mapa?
@@ -41,10 +48,10 @@ def auditar_anomalias(df_diego):
                 'Acción': 'Correr script mapa'
             })
     else:
-        console.print("[bold red]❌ No se encontró base_maestra_ids.xlsx. Imposible validar mapa.[/bold red]")
+        console.print(f"[bold red]❌ No se encontró {FILE_MAPA_IDS}. Imposible validar mapa.[/bold red]")
 
     # ==============================================================================
-    # 2. ALERTA: CLASES EN EL LIMBO (Nuevo - Pasado sin estado)
+    # 2. ALERTA: CLASES EN EL LIMBO (Pasado sin estado)
     # ==============================================================================
     # Buscamos fechas menores a hoy que NO tengan estado (están vacías)
     df_limbo = df_diego[(df_diego['FECHAS'] < hoy) & (df_diego['ESTADO DE CLASE'].isna())]
@@ -58,7 +65,7 @@ def auditar_anomalias(df_diego):
         })
 
     # ==============================================================================
-    # 3. ALERTA: DATOS FALTANTES (Nuevo - Futuro incompleto)
+    # 3. ALERTA: DATOS FALTANTES (Futuro incompleto)
     # ==============================================================================
     # Buscamos clases futuras que les falte sesión o docente
     df_futuro = df_diego[df_diego['FECHAS'] >= hoy]
@@ -73,7 +80,7 @@ def auditar_anomalias(df_diego):
         })
 
     # ==============================================================================
-    # 4. ALERTAS DE CONSISTENCIA (Tu código original mejorado)
+    # 4. ALERTAS DE CONSISTENCIA
     # ==============================================================================
     for id_val, grupo in df_diego.groupby('ID'):
         # Nombre Contradictorio
@@ -97,7 +104,7 @@ def auditar_anomalias(df_diego):
             })
 
     # ==============================================================================
-    # 5. RESULTADOS
+    # 5. RESULTADOS (Exportación a CSV)
     # ==============================================================================
     if lista_alertas:
         df_alertas = pd.DataFrame(lista_alertas)
@@ -113,16 +120,10 @@ def auditar_anomalias(df_diego):
         
         console.print(table)
         
-        # B. Guardar Excel (Tu formato original)
+        # B. Guardar CSV (Ligero y Rápido) en 01_data/operaciones/
         try:
-            with pd.ExcelWriter(ARCHIVO_ALERTAS, engine='xlsxwriter') as writer:
-                df_alertas.to_excel(writer, index=False, sheet_name='Alertas')
-                worksheet = writer.sheets['Alertas']
-                f_wrap = writer.book.add_format({'text_wrap': True, 'valign': 'top'})
-                worksheet.set_column('A:A', 20, f_wrap)
-                worksheet.set_column('B:B', 25, f_wrap)
-                worksheet.set_column('C:C', 50, f_wrap)
-                worksheet.set_column('D:D', 20, f_wrap)
+            # Usamos ; y latin1 para compatibilidad total con Excel en español
+            df_alertas.to_csv(ARCHIVO_ALERTAS, index=False, sep=';', encoding='latin1')
             
             console.print(f"[yellow]📂 Reporte detallado guardado en: {ARCHIVO_ALERTAS}[/yellow]")
             return True
