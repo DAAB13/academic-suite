@@ -6,6 +6,7 @@ from src.operaciones import etl_ope
 from src.reporte_semanal import incidencias, etl_sunday, agente_ia, outlook
 import warnings
 
+# Silenciamos avisos visuales de Excel que no afectan al proceso
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl") 
 
 # --- APLICACIÓN PRINCIPAL ---
@@ -75,15 +76,16 @@ def etl_operaciones():
 def registrar_incidencia(
     id_clase: str = typer.Option(..., "--id", help="ID único => Periodo.NRC"),
     motivo: str = typer.Option(..., help="Descripción de la incidencia"),
-    # Mantenemos el default de hoy, pero si escribes --fecha DD/MM/AAAA lo sobreescribe
+    # Si no pones fecha, Python usa la de hoy automáticamente
     fecha: str = typer.Option(datetime.now().strftime("%d/%m/%Y"), "--fecha", help="Fecha de la clase (DD/MM/YYYY)")
 ):
     """--id '' --fecha '' --motvio ''"""
+    # Llama a la función 'registrar' que vimos en incidencias.py
     incidencias.registrar(id_clase, motivo, fecha)
 
 @reporte_app.command('sunday')
 def ejecutar_reporte_semanal():
-    """Genera reporte los domingos por correo electrónico"""
+    """El proceso estrella: ETL -> IA -> Outlook"""
     df_para_ia = etl_sunday.run()
     
     if df_para_ia is not None:
@@ -97,7 +99,7 @@ def ejecutar_reporte_semanal():
         
         # 2. ENVIAR A OUTLOOK
         
-        outlook.crear_borrador(texto_correo, df_para_ia)
+        outlook.crear_borrador(texto_correo)
         
         print("\n[bold green]✔ Datos y redacción listos para enviar.[/bold green]")
 

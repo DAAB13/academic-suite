@@ -2,19 +2,21 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 from rich.console import Console
+from src.shared.config_loader import config, BASE_DIR
 
 console = Console()
 
 # Configuración de Rutas
-DATA_DIR = Path("01_data/reporte_semanal")
-LOG_FILE = DATA_DIR / "incidencias_log.csv"
+LOG_FILE = BASE_DIR / config['paths']['data'] / config['files']['incidencias_log']
+DATA_DIR = LOG_FILE.parent # crea la carpeta si no existe
+
 
 def registrar(id_clase: str, motivo: str, fecha_clase: str):
     try:
         # 1. Asegurar existencia de la carpeta
         DATA_DIR.mkdir(parents=True, exist_ok=True,)
         
-        # 2. Estructura de datos (Sin DOCENTE para evitar redundancia)
+        # 2. Preparamos la información en un diccionario (Sin DOCENTE para evitar redundancia)
         nueva_fila = {
             "FECHA_REGISTRO": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "ID": id_clase,
@@ -26,6 +28,7 @@ def registrar(id_clase: str, motivo: str, fecha_clase: str):
         
         # 3. Guardar
         header = not LOG_FILE.exists()
+        # mode='a' apila las filas
         df.to_csv(LOG_FILE, mode='a', index=False, header=header, encoding='utf-8')
         
         console.print(f"[bold green]✔[/bold green] Incidencia guardada en bitácora para el ID: [yellow]{id_clase}[/yellow]")

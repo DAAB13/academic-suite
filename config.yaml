@@ -12,7 +12,19 @@ files:
   reporte_domingo: "reporte_semanal/tabla_reporte_domingo.xlsx"
   reporte_alertas: "operaciones/reporte_alertas.csv"
   reporte_grabaciones: "bot_blackboard/reporte_grabaciones.xlsx"
+  separador_alertas_csv: ";"
+  sepearador_incidencias_csv: ","
 
 reporting:
   recipient: "wilbert.garate@upn.edu.pe"
   subject: "REPORTE SEMANAL SUPERVISIÓN CLASES"
+
+
+dashboard:
+  estilo:
+    color_alerta: "red"
+    color_fondo: "#1a1a2e"
+    color_tarjeta: "#252545"
+  textos:
+    titulo_alerta: "DANGER LEVEL"
+    subtitulo_alerta: "Alertas detectadas"

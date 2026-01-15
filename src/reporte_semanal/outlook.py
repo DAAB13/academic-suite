@@ -26,15 +26,14 @@ def excel_a_html(ruta_archivo):
     except Exception as e:
         return f"<p style='color:red;'>Error al procesar el Excel: {str(e)}</p>"
 
-def crear_borrador(contenido_cuerpo, df_alertas):
+def crear_borrador(contenido_cuerpo):
     """Crea el borrador unificando la ruta del archivo."""
     try:
         # 1. DEFINIMOS LA RUTA UNA SOLA VEZ
-        # ruta_base = os.getcwd() -> Reemplazado por BASE_DIR
         ruta_final_excel = str(BASE_DIR / config['paths']['data'] / config['files']['reporte_domingo'])
 
         outlook = win32.Dispatch('outlook.application')
-        mail = outlook.CreateItem(0)
+        mail = outlook.CreateItem(0) # correo nuevo
         
         # Actualizado desde config.yaml
         mail.To = config['reporting']['recipient']
@@ -46,9 +45,10 @@ def crear_borrador(contenido_cuerpo, df_alertas):
         else:
             tabla_desde_excel = "<p style='color:red;'>Error: No se encontró el archivo físico.</p>"
 
-        mail.Display() 
+        mail.Display() # Mostramos el correo
         firma_cargada = mail.HTMLBody 
         
+        # 3. ENSAMBLAJE DEL CUERPO (HTML)
         mail.HTMLBody = f"""
         <html>
             <body style="font-family: Calibri, sans-serif; font-size: 11pt;">
@@ -62,7 +62,7 @@ def crear_borrador(contenido_cuerpo, df_alertas):
             </body>
         </html>
         """
-        
+        # Guardamos en la carpeta de 'Borradores'
         mail.Save() 
         console.print("[bold green]✉️ Borrador generado correctamente con tabla incrustada.[/bold green]")
         
