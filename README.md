@@ -16,17 +16,19 @@ El sistema está organizado para garantizar escalabilidad, integridad de datos y
 
 ### 🧠 Datos Maestros (`01_data/`)
 Información estructurada, bitácoras históricas y diccionarios de traducción.
-* **🔑 `base_maestra_ids.xlsx`**: Diccionario relacional de IDs de cursos extraídos mediante API.
-* **⛽ `resumen_con_llave.xlsx`**: Datos filtrados y validados que dirigen la ejecución del Robot RPA.
+* **📁 `bot_blackboard/`**:
+    * **📝 `base_maestra_ids.csv`**:
+    * **📝 `resumen_con_llave`**:
+* **📁 `operaciones/`**:
+    * **📊 `reportes_alertas.csv`**:
 * **📁 `reporte_semanal/`**:
-    * **📝 `incidencias_log.csv`**: Base de datos de novedades (La fuente de la verdad) que registra fallas reportadas por docentes.
-    * **📊 `tabla_reporte_domingo.xlsx`**: Snapshot procesado y ordenado cronológicamente que sirve de sustento para el reporte de jefatura.
+    * **📝 `incidencias_log.csv`**: registra faltas de docentes
+    * **📊 `tabla_reporte_domingo.xlsx`**: Snapshot procesado y ordenado cronológicamente que sirve de sustento para el reporte a coordinación.
 
 ### 📤 Entregables (`02_outputs/`)
 * **📁 `bot_blackboard/`**:
     * 📅 **`reporte_grabaciones.xlsx`**: Extracción automatizada de links de grabación.
 * **📁 `operaciones/`**: 
-    * ⚠️ **`reporte_alertas.xlsx`**: Detalle de discrepancias y errores críticos detectados en la programación.
     * 📅 **`supervisar_hoy.xlsx`**: Agenda diaria de supervisión con formatos y estilos visuales aplicados.
 
 ### 4. 🛠️ Núcleo del Sistema (`src/`)
@@ -47,10 +49,14 @@ Dominio de la lógica de negocio, separado en micro-módulos independientes.
     * `outlook.py`: Puente de automatización con **Outlook Classic** para inyección de tablas HTML y firmas.
 * **⚙️ `shared/`**: 
     * `excel_utils.py`: Utilidades para manipulación de archivos y sincronización de red.
+    * `config.loader.py`: encargado de la gestión de rutas y configuración. Elimina las rutas 'hardcoded'. permite que el comando python academic.py funcione correctamente desde la raíz, orquestando todos los submódulos de manera fluida.
 ---
 
 ### 🚀 Orquestador Principal: `academic.py`
 Punto de entrada único de la aplicación. Utiliza una interfaz de comandos (**CLI**) basada en **Typer** para ejecutar los diferentes módulos del sistema de manera intuitiva y profesional.
+
+### `config.yaml`
+funciona como el centro de mando del proyecto, centralizando la gestión de rutas (locales y OneDrive), nombres de archivos y parámetros de envío de reportes. Su objetivo principal es desacoplar la configuración de la lógica de Python, permitiendo realizar cambios estructurales
 
 ---
 
