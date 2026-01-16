@@ -14,31 +14,29 @@ def auditar_anomalias(df_diego):
     print("\n--- 🚨 AUDITORÍA DE DATOS (ALERTAS) ---")
     
     lista_alertas = []
-    
-    # Configuración de Rutas para validar el Mapa
-    # FILE_MAPA_IDS apunta al CSV en 01_data/bot_blackboard/
+
+    #----------------------------
+    # CONFIGURACIÓN DE RUTAS
+    #----------------------------
     FILE_MAPA_IDS = BASE_DIR / config['paths']['data'] / config['files']['base_maestra_ids']
-    
-    # ARCHIVO_ALERTAS ahora será un CSV en 01_data/operaciones/
     ARCHIVO_ALERTAS = BASE_DIR / config['paths']['data'] / config['files']['reporte_alertas']
-    
-    # Aseguramos que la carpeta 01_data/operaciones exista
     ARCHIVO_ALERTAS.parent.mkdir(parents=True, exist_ok=True)
     
+    # Esta línea crea un punto de referencia para "Hoy" sin importar la hora actual
     hoy = pd.Timestamp.now().normalize()
 
     # ==============================================================================
     # 1. ALERTA CRÍTICA: ID FALTANTE EN MAPA (Actualizado a CSV)
     # ==============================================================================
-    ids_en_excel = set(df_diego[df_diego['ESTADO DE CLASE'].isna()]['ID'].unique()) # Solo nos preocupan los pendientes
+    # Obtenemos IDs únicos de clases que aún no tienen estado (pendientes)
+    ids_en_diego = set(df_diego[df_diego['ESTADO DE CLASE'].isna()]['ID'].unique())
     
-    if os.path.exists(FILE_MAPA_IDS):
+    if FILE_MAPA_IDS.exists():
         # Leemos el CSV con la configuración correcta (separador ; y latin1)
         df_mapa = pd.read_csv(FILE_MAPA_IDS, sep=';', dtype={'ID': str}, encoding='latin1')
-        ids_en_mapa = set(df_mapa['ID'].unique())
-        
+        ids_en_mapa = set(df_mapa['ID'].unique()) # set es una colección que no permite valores duplicados        
         # ¿Qué IDs tengo en mi Excel que NO están en el Mapa?
-        ids_sin_mapa = ids_en_excel - ids_en_mapa
+        ids_sin_mapa = ids_en_diego - ids_en_mapa
         
         for id_missing in ids_sin_mapa:
             lista_alertas.append({
@@ -53,7 +51,7 @@ def auditar_anomalias(df_diego):
     # ==============================================================================
     # 2. ALERTA: CLASES EN EL LIMBO (Pasado sin estado)
     # ==============================================================================
-    # Buscamos fechas menores a hoy que NO tengan estado (están vacías)
+    # Buscamos fechas anteriores a hoy y que NO tengan estado (están vacías)
     df_limbo = df_diego[(df_diego['FECHAS'] < hoy) & (df_diego['ESTADO DE CLASE'].isna())]
     
     for _, row in df_limbo.iterrows():
@@ -82,8 +80,9 @@ def auditar_anomalias(df_diego):
     # ==============================================================================
     # 4. ALERTAS DE CONSISTENCIA
     # ==============================================================================
+    # Revisa si un mismo ID tiene nombres o docentes distintos (error de tipeo).
     for id_val, grupo in df_diego.groupby('ID'):
-        # Nombre Contradictorio
+        # ¿Tiene este NRC más de un nombre de curso registrado?
         c_unicos = grupo['CURSO'].dropna().unique()
         if len(c_unicos) > 1:
             lista_alertas.append({
@@ -93,7 +92,7 @@ def auditar_anomalias(df_diego):
                 'Acción': 'Unificar nombre'
             })
         
-        # Múltiples Docentes
+        # ¿Tiene este NRC más de un docente asignado en diferentes filas?
         d_unicos = grupo['DOCENTE'].dropna().unique()
         if len(d_unicos) > 1:
             lista_alertas.append({
@@ -109,7 +108,7 @@ def auditar_anomalias(df_diego):
     if lista_alertas:
         df_alertas = pd.DataFrame(lista_alertas)
         
-        # A. Mostrar en Terminal (Rich Table) - ¡Vistazo Rápido!
+        # A. Mostrar en Terminal RICH
         table = Table(title="🚨 ALERTAS DETECTADAS", style="red")
         table.add_column("ID", style="cyan")
         table.add_column("Tipo", style="bold red")

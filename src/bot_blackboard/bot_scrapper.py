@@ -4,7 +4,8 @@ import time
 import re
 from datetime import datetime
 from playwright.sync_api import sync_playwright
-from dotenv import load_dotenv # Necesario para leer usuario/pass
+from dotenv import load_dotenv 
+from pathlib import Path
 # Importamos la configuración centralizada
 from src.shared.config_loader import config, BASE_DIR
 # Asumimos que vista_bot está en la misma carpeta o accesible
@@ -13,71 +14,64 @@ from src.bot_blackboard import vista_bot as vista
 def gestionar_login_upn(page, user_mail, user_pass):
     """
     Función robusta que maneja el flujo de Login de UPN/Laureate.
-    Detecta si ya estamos logueados o si es necesario ingresar credenciales.
-    ACTUALIZADO: Usa IDs específicos de ASP.NET y esperas inteligentes.
     """
     vista.log_accion("Verificando estado de sesión...", icono="🔐")
     
-    # Navegamos a la portada. Si hay cookies válidas, esto redirigirá solo.
+    # --- REFACTORIZADO: URL DESDE YAML ---
+    url_login = config['blackboard']['urls']['login']
+    
     try:
-        page.goto("https://upn-colaborador.blackboard.com/", wait_until="domcontentloaded")
-        time.sleep(3) # Pequeña pausa para dejar que las redirecciones ocurran
+        page.goto(url_login, wait_until="domcontentloaded")
+        time.sleep(3) 
     except:
         pass
 
-    # CASO 1: Ya estamos dentro (Redirección exitosa a Ultra)
+    # CASO 1: Ya estamos dentro
     if "ultra" in page.url or "stream" in page.url:
         vista.log_exito("Sesión recuperada (Cookies válidas)")
         return True
 
     # CASO 2: Estamos en la portada (Requiere Login)
-    # Buscamos el botón "Supervisores"
     btn_supervisores = page.locator("text=Supervisores")
     
     if btn_supervisores.is_visible():
         vista.log_accion("Iniciando Login Automático...", icono="🤖")
         btn_supervisores.click()
         
-        # --- FASE 1: INGRESAR CREDENCIALES ---
+        # --- FASE 1: INGRESAR CREDENCIALES (SELECTORES DESDE YAML) ---
         try:
-            # Definimos los selectores EXACTOS que encontramos con F12
-            selector_user = "input[id$='txtUserid']"
-            selector_pass = "input[id$='tbxPassword']"
-            selector_btn_login = "input[id$='btnSubmit']" # El botón de la primera pantalla
+            # Usamos los selectores definidos en la sección 'blackboard' del config.yaml
+            sel = config['blackboard']['selectors']
             
             # Esperamos explícitamente a que aparezca el campo de usuario
-            page.wait_for_selector(selector_user, timeout=10000)
+            page.wait_for_selector(sel['user_input'], timeout=10000)
             
             # Llenamos datos
-            page.locator(selector_user).fill(user_mail)
-            page.locator(selector_pass).fill(user_pass)
+            page.locator(sel['user_input']).fill(user_mail)
+            page.locator(sel['pass_input']).fill(user_pass)
             
             # Click en Enviar
-            page.locator(selector_btn_login).click()
+            page.locator(sel['login_btn']).click()
             vista.log_accion("Credenciales enviadas...", icono="📨")
             
             # --- FASE 2: MANEJO DE MFA (Z FLIP6) ---
-            # Buscamos el botón "Enviar" morado de la pantalla de MFA.
-            # ID termina en: RegistrationMethodView_btnSubmit
-            selector_mfa_btn = "input[id$='RegistrationMethodView_btnSubmit']"
+            # Selector desde YAML
+            selector_mfa_btn = sel['mfa_submit']
             
             vista.log_alerta("Buscando botón de confirmación MFA...")
             
-            # Espera inteligente (wait_for_selector es clave aquí)
             try:
                 page.wait_for_selector(selector_mfa_btn, state="visible", timeout=15000)
-                time.sleep(0.5) # Pequeña pausa de estabilidad
+                time.sleep(0.5) 
                 
                 vista.log_accion("Enviando solicitud al celular...", icono="📱")
                 page.locator(selector_mfa_btn).click()
                 
                 vista.log_alerta("¡ACCIÓN REQUERIDA! Acepta en tu Z Flip6 ahora.")
             except:
-                # Si no aparece el botón, quizás el sistema saltó este paso
                 vista.log_accion("No se requirió clic en MFA o ya pasó.", icono="ℹ️")
 
             # --- FASE 3: ESPERAR ACCESO FINAL ---
-            # Damos 120 segundos para que busques tu cel y aceptes
             page.wait_for_url("**/ultra/stream", timeout=120000)
             vista.log_exito("Acceso autorizado detectado.")
             return True
@@ -86,41 +80,32 @@ def gestionar_login_upn(page, user_mail, user_pass):
             vista.log_error(f"Fallo en proceso de login: {e}")
             return False
             
-    # Si no encuentra ni Ultra ni el botón Supervisores, algo raro pasa
-    elif "login" in page.url:
-        vista.log_alerta("Pantalla de login directo detectada. (Flujo alternativo)")
-        pass
-
     return True
 
 def run():
     # ==========================================
     # CONFIGURACIÓN (Rutas conectadas al YAML)
     # ==========================================
-    load_dotenv(os.path.join(BASE_DIR, ".env")) # Cargamos credenciales
+    # Cargamos credenciales usando Pathlib para la ruta del .env
+    load_dotenv(BASE_DIR / ".env") 
     UPN_MAIL = os.getenv("UPN_MAIL")
     UPN_PASS = os.getenv("UPN_PASS")
 
-    # 1. Definimos las carpetas base
-    DIR_INPUTS = BASE_DIR / config['paths']['inputs']
-    DIR_DATA = BASE_DIR / config['paths']['data']       # Para leer el CSV
-    DIR_OUTPUTS = BASE_DIR / config['paths']['outputs'] # Para guardar el Excel final
-
-    # 2. Archivos
-    # INPUT: 01_data/bot_blackboard/resumen_con_llave.csv
-    INPUT_FILE = DIR_DATA / config['files']['resumen_llave']
+    # --- REFACTORIZADO: RUTAS USANDO EL OPERADOR / DE PATHLIB ---
+    # INPUT: 01_data / bot_blackboard / resumen_con_llave.csv
+    INPUT_FILE = BASE_DIR / config['paths']['data'] / config['files']['resumen_llave']
     
-    # OUTPUT: 02_outputs/bot_blackboard/reporte_grabaciones.xlsx
-    OUTPUT_FILE = DIR_OUTPUTS / config['files']['reporte_grabaciones']
+    # OUTPUT: 02_outputs / bot_blackboard / reporte_grabaciones.xlsx
+    OUTPUT_FILE = BASE_DIR / config['paths']['outputs'] / config['files']['reporte_grabaciones']
     
-    # Perfil de Chrome
-    USER_DATA_DIR = DIR_INPUTS / "chrome_profile"
+    # Perfil de Chrome (Guardado en 00_inputs/chrome_profile)
+    USER_DATA_DIR = BASE_DIR / config['paths']['inputs'] / "chrome_profile"
 
-    # 3. Creación de Carpetas (Seguridad)
+    # Creación de Carpetas de Seguridad
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True) 
-    USER_DATA_DIR.parent.mkdir(parents=True, exist_ok=True)
+    USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Mapeo de meses
+    # Mapeo de meses (Mantenido igual)
     MESES_EN = {
         "January": "01", "February": "02", "March": "03", "April": "04", "May": "05", "June": "06",
         "July": "07", "August": "08", "September": "09", "October": "10", "November": "11", "December": "12"
@@ -131,14 +116,12 @@ def run():
         fecha_fmt, inicio_fmt, fin_fmt = texto_raw, "", ""
         texto_limpio = texto_raw.replace("\n", " ").replace("\r", " ").strip()
         try:
-            # Fecha
             match_fecha = re.search(r'([A-Za-z]+)\s+(\d+)(?:st|nd|rd|th)?,\s+(\d{4})', texto_limpio)
             if match_fecha:
                 mes_txt, dia, anio = match_fecha.groups()
                 mes_num = MESES_EN.get(mes_txt, "01")
                 fecha_fmt = f"{int(dia):02d}/{mes_num}/{anio}"
             
-            # Horas (Imán Agresivo)
             patron_hora = r'(\d{1,2}:\d{2}\s*[APap][Mm])'
             horas_encontradas = re.findall(patron_hora, texto_limpio, re.IGNORECASE)
             
@@ -159,7 +142,6 @@ def run():
                     dt_ini = datetime.strptime(hora_raw.strip(), "%I:%M %p")
                     fin_fmt = dt_ini.strftime("%H:%M")
                 except: pass
-                
         except Exception: pass
         return fecha_fmt, inicio_fmt, fin_fmt
 
@@ -187,18 +169,17 @@ def run():
         print("💡 Ejecuta 'python academic.py bb etl' primero.")
         return
 
-    # LECTURA DEL CSV INTERMEDIO (01_data)
+    # LECTURA DEL CSV INTERMEDIO
     df_input = pd.read_csv(INPUT_FILE, sep=';', dtype={'ID': str}, encoding='latin1')
     
     all_recordings = []
-
-    # [VISUAL] Tabla de Pre-vuelo
     vista.mostrar_tabla_prevuelo(df_input)
 
     with sync_playwright() as p:
         try:
+            # Lanzamos Chrome con un perfil persistente para no loguearnos cada vez si es posible
             browser_context = p.chromium.launch_persistent_context(
-                user_data_dir=USER_DATA_DIR,
+                user_data_dir=str(USER_DATA_DIR),
                 headless=False,
                 channel="chrome", 
                 args=["--start-maximized", "--disable-web-security"],
@@ -210,21 +191,18 @@ def run():
 
         page = browser_context.pages[0]
 
-        # --- CAMBIO IMPORTANTE: LOGIN AUTOMÁTICO ---
+        # --- LOGIN AUTOMÁTICO ---
         if not UPN_MAIL or not UPN_PASS:
             print("⚠️ Faltan credenciales en .env. Pasando a modo manual...")
-            page.goto("https://upn-colaborador.blackboard.com/")
+            page.goto(config['blackboard']['urls']['login'])
             input("👉 LOGUEATE, ESPERA A VER TUS CURSOS Y PRESIONA ENTER... ")
         else:
-            # Ejecutamos la lógica de auto-login ACTUALIZADA
             login_exitoso = gestionar_login_upn(page, UPN_MAIL, UPN_PASS)
             if not login_exitoso:
                 print("❌ Fallo crítico en login. Abortando.")
                 browser_context.close()
                 return
 
-        # Si llegamos aquí, estamos logueados y en Blackboard.
-        # Damos un respiro antes de empezar el ciclo agresivo
         time.sleep(2)
 
         for index, row in df_input.iterrows():
@@ -234,15 +212,14 @@ def run():
             
             if not id_interno or pd.isna(id_interno): continue
             
-            # [VISUAL] Inicio de tarjeta de curso
             vista.log_curso_inicio(index + 1, len(df_input), id_curso_visible, nombre_curso)
             
             try:
-                # 1. NAVEGACIÓN
+                # NAVEGACIÓN DINÁMICA
                 url_curso = f"https://upn.blackboard.com/ultra/courses/{id_interno}/outline"
                 navegar_robusto(page, url_curso)
                 
-                # 2. CARPETAS
+                # ... (resto de la lógica de carpetas e iframe se mantiene igual) ...
                 boton = page.get_by_text("Sala videoconferencias | Class for Teams").first
                 carpeta = page.get_by_text("MIS VIDEOCONFERENCIAS").first
                 try: page.wait_for_selector("text=Contenido del curso", timeout=5000); 
@@ -257,7 +234,6 @@ def run():
                     vista.log_accion("Entrando a Class...", icono="🖱️")
                     boton.click()
                     
-                    # 3. ESPERAR IFRAME
                     frame_teams = None
                     intentos = 0
                     while intentos < 20:
@@ -299,15 +275,12 @@ def run():
                                     row_locator = filas.nth(i)
                                     cols = row_locator.locator("td")
                                     
-                                    # Extracción
                                     fecha_raw = cols.nth(0).inner_text()
                                     duracion_txt = cols.nth(2).inner_text()
                                     link_grab = "No disponible"
                                     
-                                    # Parseo
                                     fecha_limpia, hora_ini, hora_fin = parsear_fecha_compleja(fecha_raw)
                                     
-                                    # Link Video
                                     celda_acciones = cols.last
                                     btn_menu = celda_acciones.locator("button").first 
                                     
@@ -356,7 +329,6 @@ def run():
             except Exception as e:
                 vista.log_error(f"Error crítico en curso: {e}")
             
-            # [VISUAL] Cierre de tarjeta
             vista.log_curso_fin()
 
         browser_context.close()
@@ -365,12 +337,11 @@ def run():
             print(f"\n💾 Guardando reporte FINAL en: {OUTPUT_FILE}")
             df = pd.DataFrame(all_recordings)
             
-            # GUARDADO FINAL (02_outputs)
             with pd.ExcelWriter(OUTPUT_FILE, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name='Reporte')
                 ws = writer.sheets['Reporte']
                 ws.set_column('A:A', 15)
-                ws.set_column('D:F', 12) # Fecha y Horas
+                ws.set_column('D:F', 12) 
                 ws.set_column('H:I', 60)
             print("✨ ¡FIN DEL PROCESO RPA!")
 

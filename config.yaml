@@ -12,8 +12,21 @@ files:
   reporte_domingo: "reporte_semanal/tabla_reporte_domingo.xlsx"
   reporte_alertas: "operaciones/reporte_alertas.csv"
   reporte_grabaciones: "bot_blackboard/reporte_grabaciones.xlsx"
+  reporte_supervision: "operaciones/supervisar_hoy.xlsx"
   separador_alertas_csv: ";"
   sepearador_incidencias_csv: ","
+
+blackboard:
+  urls:
+    login: "https://upn-colaborador.blackboard.com/"
+    
+    api_memberships: "https://upn.blackboard.com/learn/api/v1/users/{user_id}/memberships"
+  
+  selectors:
+    mfa_submit: "input#ContentPlaceHolder1_MFALoginControl1_RegistrationMethodView_btnSubmit"
+    user_input: "input[id$='txtUserid']"
+    pass_input: "input[id$='tbxPassword']"
+    login_btn: "input[id$='btnSubmit']"
 
 reporting:
   recipient: "wilbert.garate@upn.edu.pe"

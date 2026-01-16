@@ -6,7 +6,9 @@ from src.shared.config_loader import config, BASE_DIR
 
 console = Console()
 
+#-------------------------
 # Configuración de Rutas
+#-------------------------
 LOG_FILE = BASE_DIR / config['paths']['data'] / config['files']['incidencias_log']
 DATA_DIR = LOG_FILE.parent # crea la carpeta si no existe
 
