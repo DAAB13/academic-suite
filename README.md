@@ -4,6 +4,7 @@
 Academic Suite es una potente Aplicación CLI (Command Line Interface) diseñada para centralizar y optimizar las operaciones académicas mediante automatización robótica (RPA), inteligencia artificial y auditoría de datos.
 
 Este sistema evoluciona de scripts aislados hacia una Arquitectura Modular Desacoplada, permitiendo una gestión independiente entre el scrapping de datos de Blackboard, las tareas de supervisión diaria y la comunicación ejecutiva semanal.
+<img width="1293" height="564" alt="image" src="https://github.com/user-attachments/assets/0428cdd1-39b1-4e81-a473-25d132b2b0b9" />
 
 ---
 
